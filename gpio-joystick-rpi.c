@@ -83,34 +83,46 @@ enum joy_type {
 #define POLL_INTERVAL_NS   1000000  /* 1 ms in nanoseconds */
 
 /*
- * We have 12 signals total:
+ * We have 13 signals total:
  *   4 directions (Up, Down, Left, Right) + 8 buttons
  */
-#define TOTAL_INPUTS 12
+#define TOTAL_INPUTS 13
 
 /*
- * Default pin mappings (12 signals each).
+ * Default pin mappings (13 signals each).
  *  - [0] = Up
  *  - [1] = Down
  *  - [2] = Left
  *  - [3] = Right
  *  - [4] = Start
- *  - [5] = Select
+ *  - [5] = Select (only in P1 arcade mode)
  *  - [6] = A
  *  - [7] = B
  *  - [8] = TR
  *  - [9] = Y
  *  - [10] = X
  *  - [11] = TL
+ *  - [12] = Home (only in P1)
  */
+# ifdef ARCADE_MODE /* P2 SELECT (595) is user for P1 HOME */
 static const int joy_gpio_maps[] = {
-    573, 586, 596, 591, 579, 578, 594, 593, 592, 587, 584, 583
+    573, 586, 596, 591, 579, 578, 594, 593, 592, 587, 584, 583, 595
 };
 
-/* 2nd joystick on the B+ GPIOS (12 signals) */
+/* 2nd joystick on the B+ GPIOS (13 signals) */
 static const int joy_gpio_maps_bplus[] = {
-	580, 574, 575, 582, 588, 595, 590, 589, 585, 581, 576, 577
+	580, 574, 575, 582, 588, -1, 590, 589, 585, 581, 576, 577, -1
 };
+# else
+static const int joy_gpio_maps[] = {
+    573, 586, 596, 591, 579, 578, 594, 593, 592, 587, 584, 583, -1
+};
+
+/* 2nd joystick on the B+ GPIOS (13 signals) */
+static const int joy_gpio_maps_bplus[] = {
+	580, 574, 575, 582, 588, 595, 590, 589, 585, 581, 576, 577, -1
+};
+# endif
 
 /*
  * We treat each direction and button as a digital input.
@@ -128,17 +140,26 @@ static const short joy_gpio_btn[] = {
 	BTN_TR,         // TR
 	BTN_Y,          // Y
 	BTN_X,          // X
-	BTN_TL          // TL
+	BTN_TL,         // TL
+	BTN_MODE		// Home
 };
 
 /*
  * Joystick display names
  */
+# ifdef ARCADE_MODE
 static const char *joy_names[] = {
 	NULL,
-	"GPIO Joystick 1",
-	"GPIO Joystick 2"
+	"GPIO Joystick P1",
+	"GPIO Joystick P2"
 };
+# else
+static const char *joy_names[] = {
+	NULL,
+	"GPIO Gamepad P1",
+	"GPIO Gamepad P2"
+};
+# endif
 
 /* ------------------------------------------------------------------
  * Per-pad data
@@ -205,7 +226,7 @@ static void joy_input_report(struct joy_pad *pad, unsigned char *data)
 
 	/*
 	 * Directions + Buttons are all reported as KEY events.
-	 * We'll loop over all 12 signals, each one mapped to a "button/dpad" code.
+	 * We'll loop over all 13 signals, each one mapped to a "button/dpad" code.
 	 */
 	for (i = 0; i < TOTAL_INPUTS; i++) {
 		input_report_key(dev, joy_gpio_btn[i], data[i]);
@@ -317,14 +338,14 @@ static int __init joy_setup_pad_gpio(struct joy *joy, int idx, int pad_type)
 
 	input_set_drvdata(pad->dev, joy);
 
-	/* Only EV_KEY needed for 12 digital inputs */
+	/* Only EV_KEY needed for 13 digital inputs */
 	__set_bit(EV_KEY, pad->dev->evbit);
 
 	pad->dev->open  = joy_open;
 	pad->dev->close = joy_close;
 
 	/*
-	 * Register the 12 KEY codes. Directions are d-pad keys, next 8 are standard buttons.
+	 * Register the 13 KEY codes. Directions are d-pad keys, next 8 are standard buttons.
 	 */
 	for (i = 0; i < TOTAL_INPUTS; i++) {
 		__set_bit(joy_gpio_btn[i], pad->dev->keybit);
@@ -334,7 +355,7 @@ static int __init joy_setup_pad_gpio(struct joy *joy, int idx, int pad_type)
 
 	/*
 	 * Assign default mappings
-	 * We assume we want all 12 signals for each type. 
+	 * We assume we want all 13 signals for each type. 
 	 * If some pins are not used, set them to -1 or physically remove them.
 	 */
 	switch (pad_type) {

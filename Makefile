@@ -5,8 +5,11 @@ obj-m += gpio-joystick-rpi.o
 KERNEL_SRC := /lib/modules/$(shell uname -r)/build
 PWD := $(shell pwd)
 
-# Allow passing custom CONFIG_ARCH_BCMxxxx definitions
-EXTRA_CFLAGS :=
+# Device Tree Compiler
+DTC := dtc
+
+# Allow passing custom CONFIG_ARCH_BCMxxxx definitions. Example: make CONFIG_ARCH_BCM2712=1
+EXTRA_CFLAGS := -DARCADE_MODE=1  # Enable arcade-style inputs
 EXTRA_CFLAGS += $(if $(CONFIG_ARCH_BCM2835),-DCONFIG_ARCH_BCM2835=$(CONFIG_ARCH_BCM2835))
 EXTRA_CFLAGS += $(if $(CONFIG_ARCH_BCM2836),-DCONFIG_ARCH_BCM2836=$(CONFIG_ARCH_BCM2836))
 EXTRA_CFLAGS += $(if $(CONFIG_ARCH_BCM2837),-DCONFIG_ARCH_BCM2837=$(CONFIG_ARCH_BCM2837))
@@ -22,9 +25,12 @@ modules:
 
 # Compile the DTS file into a DTB
 dtb: gpio-joystick-rpi.dts
-	dtc -I dts -O dtb -o gpio-joystick-rpi.dtbo gpio-joystick-rpi.dts
+	$(DTC) -I dts -O dtb -o gpio-joystick-rpi.dtbo gpio-joystick-rpi.dts
 
 # Clean target
 clean:
 	$(MAKE) -C $(KERNEL_SRC) M=$(PWD) clean
 	$(RM) gpio-joystick-rpi.dtbo
+
+# Phony targets
+.PHONY: all modules dtb clean
