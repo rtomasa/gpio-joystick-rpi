@@ -1,0 +1,140 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+    compatible = "brcm,bcm2712";
+
+    fragment@0 {
+        target = <&rp1_gpio>;
+        __overlay__ {
+            pinctrl-names = "default";
+            pinctrl-0 = <&player1_pins &player2_pins>;
+
+            player1_pins: player1_pins {
+                pin_up {
+                    pins = "gpio4";
+                    function = "gpio";
+                    bias-pull-up;
+                };
+                pin_down {
+                    pins = "gpio17";
+                    function = "gpio";
+                    bias-pull-up;
+                };
+                pin_left {
+                    pins = "gpio27";
+                    function = "gpio";
+                    bias-pull-up;
+                };
+                pin_right {
+                    pins = "gpio22";
+                    function = "gpio";
+                    bias-pull-up;
+                };
+                pin_start {
+                    pins = "gpio10";
+                    function = "gpio";
+                    bias-pull-up;
+                };
+                pin_select {
+                    pins = "gpio9";
+                    function = "gpio";
+                    bias-pull-up;
+                };
+                pin_a {
+                    pins = "gpio25";
+                    function = "gpio";
+                    bias-pull-up;
+                };
+                pin_b {
+                    pins = "gpio24";
+                    function = "gpio";
+                    bias-pull-up;
+                };
+                pin_tr {
+                    pins = "gpio23";
+                    function = "gpio";
+                    bias-pull-up;
+                };
+                pin_y {
+                    pins = "gpio18";
+                    function = "gpio";
+                    bias-pull-up;
+                };
+                pin_x {
+                    pins = "gpio15";
+                    function = "gpio";
+                    bias-pull-up;
+                };
+                pin_tl {
+                    pins = "gpio14";
+                    function = "gpio";
+                    bias-pull-up;
+                };
+            };
+
+            player2_pins: player2_pins {
+                pin_up {
+                    pins = "gpio11";
+                    function = "gpio";
+                    bias-pull-up;
+                };
+                pin_down {
+                    pins = "gpio5";
+                    function = "gpio";
+                    bias-pull-up;
+                };
+                pin_left {
+                    pins = "gpio6";
+                    function = "gpio";
+                    bias-pull-up;
+                };
+                pin_right {
+                    pins = "gpio13";
+                    function = "gpio";
+                    bias-pull-up;
+                };
+                pin_start {
+                    pins = "gpio19";
+                    function = "gpio";
+                    bias-pull-up;
+                };
+                pin_select {
+                    pins = "gpio26";
+                    function = "gpio";
+                    bias-pull-up;
+                };
+                pin_a {
+                    pins = "gpio21";
+                    function = "gpio";
+                    bias-pull-up;
+                };
+                pin_b {
+                    pins = "gpio20";
+                    function = "gpio";
+                    bias-pull-up;
+                };
+                pin_tr {
+                    pins = "gpio16";
+                    function = "gpio";
+                    bias-pull-up;
+                };
+                pin_y {
+                    pins = "gpio12";
+                    function = "gpio";
+                    bias-pull-up;
+                };
+                pin_x {
+                    pins = "gpio7";
+                    function = "gpio";
+                    bias-pull-up;
+                };
+                pin_tl {
+                    pins = "gpio8";
+                    function = "gpio";
+                    bias-pull-up;
+                };
+            };
+        };
+    };
+};
