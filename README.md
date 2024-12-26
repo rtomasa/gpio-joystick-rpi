@@ -4,11 +4,12 @@ This repository contains the GPIO Joystick Driver for Raspberry Pi 5, which allo
 
 ## Features
 
-- Supports up to 2 joysticks, each with 12 inputs:
+- Supports up to 2 joysticks, each with 13 inputs:
   - 4 digital directions: Up, Down, Left, Right.
   - 9 buttons: Start, Select, A, B, TR, Y, X, TL, Home.
 - High-performance 1 ms polling using hrtimers.
-- Configurable via device tree overlays and module parameters.
+- Configurable via `ARCADE_MODE` and device tree overlays.
+- Device Tree compilation integrated into the `Makefile` for ease of use.
 
 ## Requirements
 
@@ -97,21 +98,18 @@ Repeat the process for all GPIO pins used by your joystick.
 
 ## Device Tree Overlay
 
-For permanent configuration, use the provided `gpio-joystick-rpi.dts` overlay. Compile and load it as follows:
+For permanent configuration, the `gpio-joystick-rpi.dts` overlay is compiled automatically via the `Makefile`.
 
-### 1. Compile the Overlay
+### 1. Compile and Install the Overlay
 
-```bash
-dtc -I dts -O dtb -o gpio-joystick-rpi.dtbo gpio-joystick-rpi.dts
-```
-
-### 2. Copy the Overlay to `/boot/overlays`
+Run the following command to build the overlay and copy it to `/boot/overlays`:
 
 ```bash
+make dtb
 sudo cp gpio-joystick-rpi.dtbo /boot/overlays/
 ```
 
-### 3. Enable the Overlay
+### 2. Enable the Overlay
 
 Add the following line to `/boot/config.txt`:
 
@@ -119,7 +117,7 @@ Add the following line to `/boot/config.txt`:
 dtoverlay=gpio-joystick-rpi
 ```
 
-### 4. Reboot
+### 3. Reboot
 
 ```bash
 sudo reboot
@@ -132,4 +130,3 @@ Contributions are welcome! Please fork the repository, make changes, and submit 
 ## License
 
 This project is licensed under the GPLv2 License. See the LICENSE file for details.
-
