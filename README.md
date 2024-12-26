@@ -6,7 +6,7 @@ This repository contains the GPIO Joystick Driver for Raspberry Pi 5, which allo
 
 - Supports up to 2 joysticks, each with 12 inputs:
   - 4 digital directions: Up, Down, Left, Right.
-  - 8 buttons: Start, Select, A, B, TR, Y, X, TL.
+  - 9 buttons: Start, Select, A, B, TR, Y, X, TL, Home.
 - High-performance 1 ms polling using hrtimers.
 - Configurable via device tree overlays and module parameters.
 
