@@ -21,6 +21,7 @@ This repository contains the GPIO Joystick Driver for Raspberry Pi 5, which allo
 ### 1. Compile the Driver
 
 ```bash
+apt install gpiod libgpiod-dev device-tree-compiler
 make
 ```
 
