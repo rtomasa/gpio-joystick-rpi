@@ -35,7 +35,7 @@ install: modules dtb
 
 # Uninstall module and device tree overlay (requires root)
 uninstall:
-	rm -f /lib/modules/$(shell uname -r)/extra/gpio-joystick.ko
+	rm -f /lib/modules/$(shell uname -r)/extra/gpio-joystick.ko*
 	rm -f /boot/firmware/overlays/gpio-joystick.dtbo
 	depmod -a
 
