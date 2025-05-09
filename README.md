@@ -4,37 +4,61 @@ This repository contains the GPIO Joystick Driver for Raspberry Pi 5, which allo
 
 ## Features
 
-- Supports up to 2 joysticks, each with 13 inputs:
-  - 4 digital directions: Up, Down, Left, Right.
-  - 9 buttons: Start, Select, A, B, TR, Y, X, TL, Home.
-- High-performance 1 ms polling using hrtimers.
-- Configurable via `ARCADE_MODE` and device tree overlays.
-- Device Tree compilation integrated into the `Makefile` for ease of use.
+* Supports up to 2 joysticks, each with 13 inputs:
+
+  * 4 digital directions: Up, Down, Left, Right.
+  * 9 buttons: Start, Select, A, B, TR, Y, X, TL, Home.
+* High-performance 1 ms polling using hrtimers.
+* Configurable via `ARCADE_MODE` and device tree overlays.
+* Device Tree compilation integrated into the `Makefile` for ease of use.
 
 ## Requirements
 
-- Raspberry Pi 5 (RP1-based GPIO pin controller).
-- Linux kernel version >= 6.6.
-- `evtest` or `jstest` for input testing.
+* Raspberry Pi 5 (RP1-based GPIO pin controller).
+* Linux kernel version >= 6.6.
+* `evtest` or `jstest` for input testing.
 
 ## Installation
 
-### 1. Compile the Driver
+### Install dependencies
 
 ```bash
 sudo apt install gpiod libgpiod-dev device-tree-compiler
+```
+
+### Automatic Installation (Recommended)
+
+Compile and install the kernel module and device tree overlay automatically:
+
+```bash
+make
+sudo make install
+sudo depmod -a
+```
+
+Reboot to activate the changes:
+
+```bash
+sudo reboot
+```
+
+### Manual Installation
+
+#### 1. Compile the Driver
+
+```bash
 make
 ```
 
-### 2. Insert the Module
+#### 2. Insert the Module Temporarily
 
-Manually insert the module (this installation is temporary and will last until the system is rebooted):
+Manually insert the module (temporary until reboot):
 
 ```bash
-sudo insmod gpio-joystick-rpi.ko map=1,2
+sudo insmod gpio-joystick.ko map=1,2
 ```
 
-### 3. Check Logs
+#### 3. Check Logs
 
 Verify the driver is loaded and joysticks are detected:
 
@@ -46,7 +70,7 @@ dmesg | grep "GPIO Joystick"
 
 ### Using `evtest`
 
-Install `evtest` and use it to check joystick events:
+Install and run `evtest` to verify joystick events:
 
 ```bash
 sudo apt install evtest
@@ -57,7 +81,7 @@ Select the appropriate input device corresponding to your joystick.
 
 ### Using `jstest`
 
-Install `jstest` and test the joystick:
+Install and test the joystick with `jstest`:
 
 ```bash
 sudo apt install joystick
@@ -69,7 +93,7 @@ jstest /dev/input/js1
 
 ### How to Check New Pin Numbers (kernel >= 6.6)
 
-Use the following command to list GPIO pins:
+List GPIO pins with:
 
 ```bash
 cat /sys/kernel/debug/gpio
@@ -77,7 +101,7 @@ cat /sys/kernel/debug/gpio
 
 ### How to Check Pin Status on Pi 5
 
-Use `pinctrl` to inspect pin configuration:
+Inspect pin configuration:
 
 ```bash
 sudo pinctrl
@@ -85,7 +109,7 @@ sudo pinctrl
 
 ## Manually Setting Pull-Ups
 
-To manually configure pull-ups for GPIO pins using `pinctrl`:
+To manually configure pull-ups for GPIO pins:
 
 ```bash
 sudo pinctrl gpiochip4 4 ip pu   # Set GPIO4 as input with pull-up
@@ -94,30 +118,30 @@ sudo pinctrl gpiochip4 27 ip pu  # Set GPIO27 as input with pull-up
 sudo pinctrl gpiochip4 22 ip pu  # Set GPIO22 as input with pull-up
 ```
 
-Repeat the process for all GPIO pins used by your joystick.
+Repeat this for all GPIO pins used by your joystick.
 
-## Device Tree Overlay
+## Device Tree Overlay (permanent configuration)
 
-For permanent configuration, the `gpio-joystick-rpi.dts` overlay is compiled automatically via the `Makefile`.
+The overlay `gpio-joystick.dts` is compiled automatically via the `Makefile`.
 
-### 1. Compile and Install the Overlay
+### Manual Compilation and Installation
 
-Run the following command to build the overlay and copy it to `/boot/overlays`:
+Run the following commands to build and install the overlay manually:
 
 ```bash
 make dtb
-sudo cp gpio-joystick-rpi.dtbo /boot/overlays/
+sudo cp gpio-joystick.dtbo /boot/overlays/
 ```
 
-### 2. Enable the Overlay
+### Enable the Overlay
 
-Add the following line to `/boot/config.txt`:
+Edit `/boot/config.txt` and add:
 
 ```bash
-dtoverlay=gpio-joystick-rpi
+dtoverlay=gpio-joystick
 ```
 
-### 3. Reboot
+Reboot to apply changes:
 
 ```bash
 sudo reboot

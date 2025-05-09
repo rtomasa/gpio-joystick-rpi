@@ -1,5 +1,5 @@
 # Module name
-obj-m += gpio-joystick-rpi.o
+obj-m += gpio-joystick.o
 
 # Get kernel version and directory
 KERNEL_SRC := /lib/modules/$(shell uname -r)/build
@@ -24,13 +24,19 @@ modules:
 	$(MAKE) -C $(KERNEL_SRC) M=$(PWD) EXTRA_CFLAGS="$(EXTRA_CFLAGS)" modules
 
 # Compile the DTS file into a DTB
-dtb: gpio-joystick-rpi.dts
-	$(DTC) -I dts -O dtb -o gpio-joystick-rpi.dtbo gpio-joystick-rpi.dts
+dtb: gpio-joystick.dts
+	$(DTC) -I dts -O dtb -o gpio-joystick.dtbo gpio-joystick.dts
+
+# Install module and device tree overlay (requires root)
+install: modules dtb
+	$(MAKE) -C $(KERNEL_SRC) M=$(PWD) EXTRA_CFLAGS="$(EXTRA_CFLAGS)" modules_install
+	install -D -m 0644 gpio-joystick.dtbo /boot/firmware/overlays/gpio-joystick.dtbo
+	depmod -a
 
 # Clean target
 clean:
 	$(MAKE) -C $(KERNEL_SRC) M=$(PWD) clean
-	$(RM) gpio-joystick-rpi.dtbo
+	$(RM) gpio-joystick.dtbo
 
 # Phony targets
-.PHONY: all modules dtb clean
+.PHONY: all modules dtb clean install
