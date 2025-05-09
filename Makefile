@@ -33,10 +33,16 @@ install: modules dtb
 	install -D -m 0644 gpio-joystick.dtbo /boot/firmware/overlays/gpio-joystick.dtbo
 	depmod -a
 
+# Uninstall module and device tree overlay (requires root)
+uninstall:
+	rm -f /lib/modules/$(shell uname -r)/extra/gpio-joystick.ko
+	rm -f /boot/firmware/overlays/gpio-joystick.dtbo
+	depmod -a
+
 # Clean target
 clean:
 	$(MAKE) -C $(KERNEL_SRC) M=$(PWD) clean
 	$(RM) gpio-joystick.dtbo
 
 # Phony targets
-.PHONY: all modules dtb clean install
+.PHONY: all modules dtb clean install uninstall
