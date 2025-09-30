@@ -4,135 +4,104 @@
 / {
     compatible = "brcm,bcm2712";
 
+    /* Pin mux blocks for both players */
+
     fragment@0 {
         target = <&rp1_gpio>;
         __overlay__ {
-            pinctrl-names = "default";
-            pinctrl-0 = <&player1_pins &player2_pins>;
+
+            /* Pullup configurations: bias-pull-up, bias-pull-down, bias-disable */
 
             player1_pins: player1_pins {
-                pin_up {
-                    pins = "gpio4";
-                    function = "gpio";
-                    bias-pull-up;
-                };
-                pin_down {
-                    pins = "gpio17";
-                    function = "gpio";
-                    bias-pull-up;
-                };
-                pin_left {
-                    pins = "gpio27";
-                    function = "gpio";
-                    bias-pull-up;
-                };
-                pin_right {
-                    pins = "gpio22";
-                    function = "gpio";
-                    bias-pull-up;
-                };
-                pin_start {
-                    pins = "gpio10";
-                    function = "gpio";
-                    bias-pull-up;
-                };
-                pin_select {
-                    pins = "gpio9";
-                    function = "gpio";
-                    bias-pull-up;
-                };
-                pin_a {
-                    pins = "gpio25";
-                    function = "gpio";
-                    bias-pull-up;
-                };
-                pin_b {
-                    pins = "gpio24";
-                    function = "gpio";
-                    bias-pull-up;
-                };
-                pin_tr {
-                    pins = "gpio23";
-                    function = "gpio";
-                    bias-pull-up;
-                };
-                pin_y {
-                    pins = "gpio18";
-                    function = "gpio";
-                    bias-pull-up;
-                };
-                pin_x {
-                    pins = "gpio15";
-                    function = "gpio";
-                    bias-pull-up;
-                };
-                pin_tl {
-                    pins = "gpio14";
-                    function = "gpio";
-                    bias-pull-up;
-                };
+                pin_up     { pins = "gpio4";  function = "gpio"; input-enable; bias-pull-up; };
+                pin_down   { pins = "gpio17"; function = "gpio"; input-enable; bias-pull-up; };
+                pin_left   { pins = "gpio27"; function = "gpio"; input-enable; bias-pull-up; };
+                pin_right  { pins = "gpio22"; function = "gpio"; input-enable; bias-pull-up; };
+                pin_start  { pins = "gpio10"; function = "gpio"; input-enable; bias-pull-up; };
+                pin_select { pins = "gpio9";  function = "gpio"; input-enable; bias-pull-up; };   
+                pin_a      { pins = "gpio25"; function = "gpio"; input-enable; bias-pull-up; };
+                pin_b      { pins = "gpio24"; function = "gpio"; input-enable; bias-pull-up; };
+                pin_tr     { pins = "gpio23"; function = "gpio"; input-enable; bias-pull-up; };
+                pin_y      { pins = "gpio18"; function = "gpio"; input-enable; bias-pull-up; };
+                pin_x      { pins = "gpio15"; function = "gpio"; input-enable; bias-pull-up; };
+                pin_tl     { pins = "gpio14"; function = "gpio"; input-enable; bias-pull-up; };
+                pin_home   { pins = "gpio2";  function = "gpio"; input-enable; bias-pull-up; };
+                pin_test   { pins = "gpio3";  function = "gpio"; input-enable; bias-pull-up; };
             };
 
             player2_pins: player2_pins {
-                pin_up {
-                    pins = "gpio11";
-                    function = "gpio";
-                    bias-pull-up;
+                pin_up     { pins = "gpio11"; function = "gpio"; input-enable; bias-pull-up; };
+                pin_down   { pins = "gpio5";  function = "gpio"; input-enable; bias-pull-up; };
+                pin_left   { pins = "gpio6";  function = "gpio"; input-enable; bias-pull-up; };
+                pin_right  { pins = "gpio13"; function = "gpio"; input-enable; bias-pull-up; };
+                pin_start  { pins = "gpio19"; function = "gpio"; input-enable; bias-pull-up; };
+                pin_select { pins = "gpio26"; function = "gpio"; input-enable; bias-pull-up; };
+                pin_a      { pins = "gpio21"; function = "gpio"; input-enable; bias-pull-up; };
+                pin_b      { pins = "gpio20"; function = "gpio"; input-enable; bias-pull-up; };
+                pin_tr     { pins = "gpio16"; function = "gpio"; input-enable; bias-pull-up; };
+                pin_y      { pins = "gpio12"; function = "gpio"; input-enable; bias-pull-up; };
+                pin_x      { pins = "gpio7";  function = "gpio"; input-enable; bias-pull-up; };
+                pin_tl     { pins = "gpio8";  function = "gpio"; input-enable; bias-pull-up; };
+            };
+        };
+    };
+
+    /* Both joystick devices live under a container with 1-cell addresses */
+
+    fragment@1 {
+        target-path = "/";
+        __overlay__ {
+            gpio_joysticks: gpio-joysticks {
+                compatible = "simple-bus";
+                #address-cells = <1>;
+                #size-cells = <0>;
+
+                gpio_joystick0: gpio-joystick@0 {
+                    compatible = "rta,gpio-joystick";
+                    status = "okay";
+                    pinctrl-names = "default";
+                    pinctrl-0 = <&player1_pins>;
+                    reg = <0>;
+
+                    /* 0 = GPIO_ACTIVE_HIGH
+                       1 = GPIO_ACTIVE_LOW */
+                       
+                    up-gpios     = <&rp1_gpio  4 0>;
+                    down-gpios   = <&rp1_gpio 17 0>;
+                    left-gpios   = <&rp1_gpio 27 0>;
+                    right-gpios  = <&rp1_gpio 22 0>;
+                    start-gpios  = <&rp1_gpio 10 0>;
+                    select-gpios = <&rp1_gpio  9 0>;
+                    a-gpios      = <&rp1_gpio 25 0>;
+                    b-gpios      = <&rp1_gpio 24 0>;
+                    tr-gpios     = <&rp1_gpio 23 0>;
+                    y-gpios      = <&rp1_gpio 18 0>;
+                    x-gpios      = <&rp1_gpio 15 0>;
+                    tl-gpios     = <&rp1_gpio 14 0>;
+                    home-gpios   = <&rp1_gpio  2 0>;
+                    test-gpios   = <&rp1_gpio  3 0>;
                 };
-                pin_down {
-                    pins = "gpio5";
-                    function = "gpio";
-                    bias-pull-up;
-                };
-                pin_left {
-                    pins = "gpio6";
-                    function = "gpio";
-                    bias-pull-up;
-                };
-                pin_right {
-                    pins = "gpio13";
-                    function = "gpio";
-                    bias-pull-up;
-                };
-                pin_start {
-                    pins = "gpio19";
-                    function = "gpio";
-                    bias-pull-up;
-                };
-                pin_select {
-                    pins = "gpio26";
-                    function = "gpio";
-                    bias-pull-up;
-                };
-                pin_a {
-                    pins = "gpio21";
-                    function = "gpio";
-                    bias-pull-up;
-                };
-                pin_b {
-                    pins = "gpio20";
-                    function = "gpio";
-                    bias-pull-up;
-                };
-                pin_tr {
-                    pins = "gpio16";
-                    function = "gpio";
-                    bias-pull-up;
-                };
-                pin_y {
-                    pins = "gpio12";
-                    function = "gpio";
-                    bias-pull-up;
-                };
-                pin_x {
-                    pins = "gpio7";
-                    function = "gpio";
-                    bias-pull-up;
-                };
-                pin_tl {
-                    pins = "gpio8";
-                    function = "gpio";
-                    bias-pull-up;
+
+                gpio_joystick1: gpio-joystick@1 {
+                    compatible = "rta,gpio-joystick";
+                    status = "okay";
+                    pinctrl-names = "default";
+                    pinctrl-0 = <&player2_pins>;
+                    reg = <1>;
+
+                    up-gpios     = <&rp1_gpio 11 0>;
+                    down-gpios   = <&rp1_gpio  5 0>;
+                    left-gpios   = <&rp1_gpio  6 0>;
+                    right-gpios  = <&rp1_gpio 13 0>;
+                    start-gpios  = <&rp1_gpio 19 0>;
+                    select-gpios = <&rp1_gpio 26 0>;
+                    a-gpios      = <&rp1_gpio 21 0>;
+                    b-gpios      = <&rp1_gpio 20 0>;
+                    tr-gpios     = <&rp1_gpio 16 0>;
+                    y-gpios      = <&rp1_gpio 12 0>;
+                    x-gpios      = <&rp1_gpio  7 0>;
+                    tl-gpios     = <&rp1_gpio  8 0>;
+                    /* No home/test for P2 */
                 };
             };
         };

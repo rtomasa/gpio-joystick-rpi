@@ -1,16 +1,8 @@
 /*
  *  GPIO Joystick Driver for Raspberry Pi 5
  *
- *  Copyright (c) 2024: Ruben Tomas Alonso
- * 
- *  Based on the mk_arcade_joystick_rpi driver by:
- *  	- Matthieu Proucelle
- * 		- Mark Spaeth
- * 		- Daniel Moreno
- *  Based on the gamecon driver by:
- * 		- Vojtech Pavlik
- * 		- Markus Hiienkari
- * 
+ *  Copyright (c) 2025: Ruben Tomas Alonso
+ *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2 of the License, or
@@ -35,12 +27,16 @@
 #include <linux/input.h>
 #include <linux/mutex.h>
 #include <linux/slab.h>
-#include <linux/gpio/consumer.h>   /* For gpiod_* APIs */
-#include <linux/gpio.h>            /* For gpio_to_desc() */
-#include <linux/of.h>              /* For Device Tree structures (optional) */
-#include <linux/of_gpio.h>         /* For of_get_named_gpio() if needed */
-#include <linux/hrtimer.h>         /* For high-resolution timers */
+#include <linux/gpio/consumer.h> /* For gpiod_* APIs */
+#include <linux/of.h>			 /* For Device Tree structures (optional) */
+#include <linux/hrtimer.h>		 /* For high-resolution timers */
 #include <linux/ktime.h>
+#include <linux/platform_device.h>
+#include <linux/workqueue.h>
+
+static const struct of_device_id gpio_joy_of_match[] = {
+	{.compatible = "rta,gpio-joystick"},
+	{/* sentinel */}};
 
 /*
  * Module info
@@ -48,31 +44,14 @@
 MODULE_AUTHOR("Ruben Tomas Alonso");
 MODULE_DESCRIPTION("GPIO Joystick Driver for RPi5 (digital D-Pad)");
 MODULE_LICENSE("GPL");
-
-#define MAX_DEVICES   2
-
-/* ------------------------------------------------------------------
- * Configuration via module parameters
- * ------------------------------------------------------------------ */
-struct joy_config {
-	int args[MAX_DEVICES];
-	unsigned int nargs;
-};
-
-static struct joy_config joy_cfg __initdata;
-
-/*
- * module_param_array_named for 'map' to pick the joystick type:
- *   TYPE_JOYSTICK_GPIO, TYPE_JOYSTICK_GPIO_BPLUS
- */
-module_param_array_named(map, joy_cfg.args, int, &(joy_cfg.nargs), 0);
-MODULE_PARM_DESC(map, "Enable GPIO Joystick(s)");
+MODULE_DEVICE_TABLE(of, gpio_joy_of_match);
 
 /* ------------------------------------------------------------------
  * Defines & Data
  * ------------------------------------------------------------------ */
 
-enum joy_type {
+enum joy_type
+{
 	TYPE_NONE = 0,
 	TYPE_JOYSTICK_GPIO,
 	TYPE_JOYSTICK_GPIO_BPLUS,
@@ -80,139 +59,74 @@ enum joy_type {
 };
 
 /* We poll at 1 ms via hrtimer */
-#define POLL_INTERVAL_NS   1000000  /* 1 ms in nanoseconds */
+static unsigned int poll_ms = 1;
+module_param(poll_ms, uint, 0644);
+#define POLL_INTERVAL_NS ((u64)poll_ms * 1000000ULL)
 
 /*
- * We have 13 signals total:
- *   4 directions (Up, Down, Left, Right) + 8 buttons
+ * We have 14 signals total:
+ *   4 directions (Up, Down, Left, Right) + 10 buttons
  */
-#define TOTAL_INPUTS 13
-
-/*
- * Default pin mappings (13 signals each).
- *  - [0] = Up
- *  - [1] = Down
- *  - [2] = Left
- *  - [3] = Right
- *  - [4] = Start
- *  - [5] = Select (only in P1 arcade mode)
- *  - [6] = A
- *  - [7] = B
- *  - [8] = TR
- *  - [9] = Y
- *  - [10] = X
- *  - [11] = TL
- *  - [12] = Home (only in P1)
- */
-# ifdef ARCADE_MODE /* P2 SELECT (595) is user for P1 HOME */
-static const int joy_gpio_maps[] = {
-    573, 586, 596, 591, 579, 578, 594, 593, 592, 587, 584, 583, 595
-};
-
-/* 2nd joystick on the B+ GPIOS (13 signals) */
-static const int joy_gpio_maps_bplus[] = {
-	580, 574, 575, 582, 588, -1, 590, 589, 585, 581, 576, 577, -1
-};
-# else
-static const int joy_gpio_maps[] = {
-    573, 586, 596, 591, 579, 578, 594, 593, 592, 587, 584, 583, -1
-};
-
-/* 2nd joystick on the B+ GPIOS (13 signals) */
-static const int joy_gpio_maps_bplus[] = {
-	580, 574, 575, 582, 588, 595, 590, 589, 585, 581, 576, 577, -1
-};
-# endif
+#define TOTAL_INPUTS 14
 
 /*
  * We treat each direction and button as a digital input.
  * We map them to Linux KEY codes (4 for directions, 8 for buttons).
  */
-static const short joy_gpio_btn[] = {
-	BTN_DPAD_UP,    // Up
-	BTN_DPAD_DOWN,  // Down
-	BTN_DPAD_LEFT,  // Left
+static const unsigned short joy_gpio_btn[] = {
+	BTN_DPAD_UP,	// Up
+	BTN_DPAD_DOWN,	// Down
+	BTN_DPAD_LEFT,	// Left
 	BTN_DPAD_RIGHT, // Right
-	BTN_START,      // Start
-	BTN_SELECT,     // Select
-	BTN_A,          // A
-	BTN_B,          // B
-	BTN_TR,         // TR
-	BTN_Y,          // Y
-	BTN_X,          // X
-	BTN_TL,         // TL
-	BTN_MODE		// Home
+	BTN_START,		// Start
+	BTN_SELECT,		// Select
+	BTN_A,			// A (1)
+	BTN_B,			// B (2)
+	BTN_TR,			// TR (6)
+	BTN_Y,			// Y (3)
+	BTN_X,			// X (4)
+	BTN_TL,			// TL (5)
+	BTN_MODE,		// Home / Service
+	BTN_THUMBR		// Test
 };
-
-/*
- * Joystick display names
- */
-# ifdef ARCADE_MODE
-static const char *joy_names[] = {
-	NULL,
-	"GPIO Joystick P1",
-	"GPIO Joystick P2"
-};
-# else
-static const char *joy_names[] = {
-	NULL,
-	"GPIO Gamepad P1",
-	"GPIO Gamepad P2"
-};
-# endif
 
 /* ------------------------------------------------------------------
  * Per-pad data
  * ------------------------------------------------------------------ */
-struct joy_pad {
+struct joy_pad
+{
 	struct input_dev *dev;
 	enum joy_type type;
 	char phys[32];
 
 	/* gpiod descriptors for each line */
 	struct gpio_desc *gpiods[TOTAL_INPUTS];
-
-	/* Store the user-provided pin numbers for debugging */
-	int gpio_maps[TOTAL_INPUTS];
 };
 
 /* ------------------------------------------------------------------
  * Main struct for the driver
  * ------------------------------------------------------------------ */
-struct joy {
-	struct joy_pad pads[MAX_DEVICES];
-
-	/* hrtimer for 1 ms polling */
+struct joy
+{
+	struct joy_pad pad;
 	struct hrtimer hrtimer;
-
-	int pad_count[TYPE_MAX];
 	int used;
 	struct mutex mutex;
-	int count;
+	struct device *dev;
+	struct work_struct poll_work;
+	struct workqueue_struct *wq;
 };
-
-static struct joy *joy_base;
 
 /* ------------------------------------------------------------------
  * Reading GPIO lines with gpiod
  * ------------------------------------------------------------------ */
 static void joy_gpio_read_packet(struct joy_pad *pad, unsigned char *data)
 {
-	int i;
-	int val;
-
-	for (i = 0; i < TOTAL_INPUTS; i++) {
-		if (pad->gpiods[i]) {
-			/*
-			 * If your hardware is active-low, keep the inversion:
-			 *   data[i] = (gpiod_get_value() == 0) ? 1 : 0;
-			 * Otherwise, remove the '== 0' check or invert logic accordingly.
-			 */
-			val = gpiod_get_value(pad->gpiods[i]);
-			data[i] = (val == 0) ? 1 : 0;
-		} else {
-			data[i] = 0;
-		}
+	for (int i = 0; i < TOTAL_INPUTS; i++)
+	{
+		struct gpio_desc *d = pad->gpiods[i];
+		int v = d ? gpiod_get_value_cansleep(d) : 1; /* pull-up => sin pulsar */
+		data[i] = (v == 0) ? 1 : 0;				     /* activo en bajo (GPIO_ACTIVE_HIGH) */
 	}
 }
 
@@ -222,13 +136,13 @@ static void joy_gpio_read_packet(struct joy_pad *pad, unsigned char *data)
 static void joy_input_report(struct joy_pad *pad, unsigned char *data)
 {
 	struct input_dev *dev = pad->dev;
-	int i;
 
 	/*
 	 * Directions + Buttons are all reported as KEY events.
-	 * We'll loop over all 13 signals, each one mapped to a "button/dpad" code.
+	 * We'll loop over all pin signals, each one mapped to a "button/dpad" code.
 	 */
-	for (i = 0; i < TOTAL_INPUTS; i++) {
+	for (int i = 0; i < TOTAL_INPUTS; i++)
+	{
 		input_report_key(dev, joy_gpio_btn[i], data[i]);
 	}
 
@@ -238,34 +152,33 @@ static void joy_input_report(struct joy_pad *pad, unsigned char *data)
 /* ------------------------------------------------------------------
  * Polling Logic
  * ------------------------------------------------------------------ */
-static void joy_process_packet(struct joy *joy)
+static void joy_process_packet(struct joy *j)
 {
 	unsigned char data[TOTAL_INPUTS];
-	struct joy_pad *pad;
-	int i;
+	struct joy_pad *pad = &j->pad;
 
-	for (i = 0; i < MAX_DEVICES; i++) {
-		pad = &joy->pads[i];
-		if (pad->type == TYPE_JOYSTICK_GPIO ||
-		    pad->type == TYPE_JOYSTICK_GPIO_BPLUS) {
-
-			joy_gpio_read_packet(pad, data);
-			joy_input_report(pad, data);
-		}
+	if (pad->type == TYPE_JOYSTICK_GPIO || pad->type == TYPE_JOYSTICK_GPIO_BPLUS)
+	{
+		joy_gpio_read_packet(pad, data);
+		joy_input_report(pad, data);
 	}
 }
 
 /* ------------------------------------------------------------------
  * hrtimer Callback
  * ------------------------------------------------------------------ */
-static enum hrtimer_restart joy_hrtimer_callback(struct hrtimer *timer)
+static void joy_poll_work(struct work_struct *work)
 {
-	struct joy *m = container_of(timer, struct joy, hrtimer);
+	struct joy *j = container_of(work, struct joy, poll_work);
+	joy_process_packet(j);
+}
 
-	joy_process_packet(m);
-
-	/* Schedule next callback in 1 ms */
-	hrtimer_forward_now(timer, ns_to_ktime(POLL_INTERVAL_NS));
+static enum hrtimer_restart joy_hrtimer_callback(struct hrtimer *t)
+{
+	struct joy *j = container_of(t, struct joy, hrtimer);
+	if (likely(j->wq))
+		queue_work(j->wq, &j->poll_work);
+	hrtimer_forward_now(t, ns_to_ktime(POLL_INTERVAL_NS));
 	return HRTIMER_RESTART;
 }
 
@@ -276,15 +189,18 @@ static int joy_open(struct input_dev *dev)
 {
 	struct joy *joy = input_get_drvdata(dev);
 	int err;
+	unsigned int ms;
 
 	err = mutex_lock_interruptible(&joy->mutex);
 	if (err)
 		return err;
 
-	if (!joy->used++) {
+	if (!joy->used++)
+	{
+		ms = poll_ms ? poll_ms : 1;
 		hrtimer_start(&joy->hrtimer,
-			      ns_to_ktime(POLL_INTERVAL_NS),
-			      HRTIMER_MODE_REL);
+					  ns_to_ktime((u64)ms * 1000000ULL),
+					  HRTIMER_MODE_REL);
 	}
 
 	mutex_unlock(&joy->mutex);
@@ -293,197 +209,194 @@ static int joy_open(struct input_dev *dev)
 
 static void joy_close(struct input_dev *dev)
 {
-	struct joy *joy = input_get_drvdata(dev);
+	struct joy *j = input_get_drvdata(dev);
 
-	mutex_lock(&joy->mutex);
-	if (!--joy->used) {
-		hrtimer_cancel(&joy->hrtimer);
+	mutex_lock(&j->mutex);
+	if (!--j->used)
+	{
+		hrtimer_cancel(&j->hrtimer);
+		cancel_work_sync(&j->poll_work);
 	}
-	mutex_unlock(&joy->mutex);
+	mutex_unlock(&j->mutex);
 }
 
 /* ------------------------------------------------------------------
  * Pad Setup using gpiod
  * ------------------------------------------------------------------ */
-static int __init joy_setup_pad_gpio(struct joy *joy, int idx, int pad_type)
+
+static void joy_input_unregister(void *data)
 {
+	struct input_dev *idev = data;
+	input_unregister_device(idev);
+}
+
+static int joy_setup_pad_gpio(struct joy *joy, int pad_type, u32 regid)
+{
+	static const char *const names[TOTAL_INPUTS] = {
+		"up", "down", "left", "right", "start", "select",
+		"a", "b", "tr", "y", "x", "tl", "home", "test"};
 	int i, err;
-	struct joy_pad *pad = &joy->pads[idx];
+	struct joy_pad *pad = &joy->pad;
 
-	if (idx >= MAX_DEVICES) {
-		pr_err("Device count exceeds max\n");
+	if (pad_type < 1 || pad_type >= TYPE_MAX)
+	{
+		dev_err(joy->dev, "[gpio-joy] Pad type %d unknown\n", pad_type);
 		return -EINVAL;
 	}
 
-	if (pad_type < 1 || pad_type >= TYPE_MAX) {
-		pr_err("Pad type %d unknown\n", pad_type);
-		return -EINVAL;
-	}
-
-	pad->dev = input_allocate_device();
-	if (!pad->dev) {
-		pr_err("Not enough memory for input device\n");
+	pad->dev = devm_input_allocate_device(joy->dev);
+	if (!pad->dev)
+	{
+		dev_err(joy->dev, "[gpio-joy] Not enough memory for input device\n");
 		return -ENOMEM;
 	}
 
 	pad->type = pad_type;
-	snprintf(pad->phys, sizeof(pad->phys), "input%d", idx);
+	snprintf(pad->phys, sizeof(pad->phys), "gpio-joystick.%u", regid);
 
-	pad->dev->name = joy_names[pad_type];
+	pad->dev->name = regid ? "GPIO Joystick P2" : "GPIO Joystick P1";
 	pad->dev->phys = pad->phys;
-	pad->dev->id.bustype = BUS_PARPORT;	// For a GPIO-based device
-	pad->dev->id.vendor  = 0x0107;		// Example vendor ID
-	pad->dev->id.product = pad_type;	// Using pad_type as product ID
-	pad->dev->id.version = 0x0100;		// Version 1.0.0
+	pad->dev->id.bustype = BUS_HOST;
+	pad->dev->id.vendor = 0x0107;
+	pad->dev->id.product = pad_type;
+	pad->dev->id.version = 0x0100;
+	pad->dev->dev.parent = joy->dev;
 
 	input_set_drvdata(pad->dev, joy);
-
-	/* Only EV_KEY needed for 13 digital inputs */
 	__set_bit(EV_KEY, pad->dev->evbit);
 
-	pad->dev->open  = joy_open;
-	pad->dev->close = joy_close;
-
-	/*
-	 * Register the 13 KEY codes. Directions are d-pad keys, next 8 are standard buttons.
-	 */
-	for (i = 0; i < TOTAL_INPUTS; i++) {
-		__set_bit(joy_gpio_btn[i], pad->dev->keybit);
+	for (i = 0; i < TOTAL_INPUTS; i++)
+	{
+		struct gpio_desc *d = devm_gpiod_get_optional(joy->dev, names[i], GPIOD_IN);
+		if (IS_ERR(d))
+			return PTR_ERR(d);
+		pad->gpiods[i] = d; /* can be NULL if it is not in DT */
+		if (d)
+			__set_bit(joy_gpio_btn[i], pad->dev->keybit);
 	}
 
-	joy->pad_count[pad_type]++;
-
-	/*
-	 * Assign default mappings
-	 * We assume we want all 13 signals for each type. 
-	 * If some pins are not used, set them to -1 or physically remove them.
-	 */
-	switch (pad_type) {
-	case TYPE_JOYSTICK_GPIO:
-		memcpy(pad->gpio_maps, joy_gpio_maps,
-		       TOTAL_INPUTS * sizeof(int));
-		break;
-	case TYPE_JOYSTICK_GPIO_BPLUS:
-		memcpy(pad->gpio_maps, joy_gpio_maps_bplus,
-		       TOTAL_INPUTS * sizeof(int));
-		break;
-	default:
-		break;
-	}
-
-	/*
-	 * For each pin, obtain a gpiod descriptor and set input direction
-	 * If any pin is -1, skip it.
-	 */
-	for (i = 0; i < TOTAL_INPUTS; i++) {
-		if (pad->gpio_maps[i] != -1) {
-			struct gpio_desc *desc;
-
-			desc = gpio_to_desc(pad->gpio_maps[i]);
-			if (!desc) {
-				pr_err("gpio_to_desc failed for GPIO %d\n",
-				       pad->gpio_maps[i]);
-				err = -EINVAL;
-				goto fail;
-			}
-			err = gpiod_direction_input(desc);
-			if (err) {
-				pr_err("Cannot set GPIO %d as input\n",
-				       pad->gpio_maps[i]);
-				goto fail;
-			}
-			pad->gpiods[i] = desc;
-		} else {
-			pad->gpiods[i] = NULL;
+	bool any = false;
+	for (i = 0; i < TOTAL_INPUTS; i++)
+	{
+		if (pad->gpiods[i])
+		{
+			any = true;
+			break;
 		}
 	}
 
-	pr_info("Joystick %d configured: type=%d, vendor=0x%04x, product=0x%04x\n",
-		idx, pad_type, pad->dev->id.vendor, pad->dev->id.product);
+	if (!any)
+	{
+		dev_err(joy->dev, "[gpio-joy] No GPIOs defined in DT; refusing to register\n");
+		return -ENODEV;
+	}
+
+	pad->dev->open = joy_open;
+	pad->dev->close = joy_close;
+
+	dev_info(joy->dev, "[gpio-joy] Joystick %u configured: type=%d, vendor=0x%04x, product=0x%04x\n",
+			 regid, pad_type, pad->dev->id.vendor, pad->dev->id.product);
 
 	err = input_register_device(pad->dev);
-	if (err) {
-		pr_err("Failed to register input device for pad %d\n", idx);
-		input_free_device(pad->dev);
-		pad->dev = NULL;
+	if (err)
+	{
+		dev_err(joy->dev, "[gpio-joy] Failed to register input device\n");
 		return err;
 	}
 
+	/* Auto-unregister */
+	err = devm_add_action_or_reset(joy->dev, joy_input_unregister, pad->dev);
+	if (err)
+		return err;
+
 	return 0;
-
-fail:
-	/* Cleanup on failure */
-	for (; i >= 0; i--) {
-		if (pad->gpiods[i]) {
-			pad->gpiods[i] = NULL;
-		}
-	}
-	input_free_device(pad->dev);
-	pad->dev = NULL;
-	return err;
-}
-
-/* ------------------------------------------------------------------
- * Probe (Set Up)
- * ------------------------------------------------------------------ */
-static struct joy __init *joy_probe(struct joy *joy, int *pads, int n_pads)
-{
-	int i, err;
-
-	for (i = 0; i < n_pads; i++) {
-		err = joy_setup_pad_gpio(joy, joy->count, pads[i]);
-		if (!err)
-			joy->count++;
-	}
-	return joy;
 }
 
 /* ------------------------------------------------------------------
  * Module Init / Exit
  * ------------------------------------------------------------------ */
-static int __init joy_init(void)
+static int gpio_joy_probe(struct platform_device *pdev)
 {
-	pr_info("Initializing GPIO Joystick Driver\n");
+	struct device *dev = &pdev->dev;
+	struct joy *j;
+	u32 id = 0; /* 0=P1, 1=P2 */
+	int err;
 
-	joy_base = kzalloc(sizeof(*joy_base), GFP_KERNEL);
-	if (!joy_base)
+	j = devm_kzalloc(dev, sizeof(*j), GFP_KERNEL);
+	if (!j)
 		return -ENOMEM;
 
-	mutex_init(&joy_base->mutex);
-	joy_base->count = 0;
+	j->dev = dev;
+	mutex_init(&j->mutex);
 
-	/* Initialize our hrtimer for 1 ms polling */
-	hrtimer_init(&joy_base->hrtimer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	joy_base->hrtimer.function = joy_hrtimer_callback;
+	INIT_WORK(&j->poll_work, joy_poll_work);
+	j->wq = alloc_workqueue("gpio-joy", WQ_HIGHPRI | WQ_UNBOUND, 1);
+	if (!j->wq)
+		return -ENOMEM;
+	hrtimer_init(&j->hrtimer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+	j->hrtimer.function = joy_hrtimer_callback;
 
-	joy_probe(joy_base, joy_cfg.args, joy_cfg.nargs);
+	of_property_read_u32(dev->of_node, "reg", &id);
 
-	if (joy_base->count < 1) {
-		pr_err("At least one valid GPIO device must be specified\n");
-		kfree(joy_base);
-		return -EINVAL;
+	err = joy_setup_pad_gpio(j, id == 0 ? TYPE_JOYSTICK_GPIO : TYPE_JOYSTICK_GPIO_BPLUS, id);
+	if (err)
+	{
+		if (j->wq)
+		{
+			drain_workqueue(j->wq);
+			destroy_workqueue(j->wq);
+			j->wq = NULL;
+		}
+		return err;
 	}
 
+	platform_set_drvdata(pdev, j);
 	return 0;
 }
 
-static void __exit joy_exit(void)
+static void gpio_joy_remove(struct platform_device *pdev)
 {
-	int i;
+	struct joy *j = platform_get_drvdata(pdev);
 
-	if (joy_base) {
-		/* Cancel the hrtimer if it's still running */
-		hrtimer_cancel(&joy_base->hrtimer);
-
-		/* Unregister input devices */
-		for (i = 0; i < joy_base->count; i++) {
-			if (joy_base->pads[i].dev)
-				input_unregister_device(joy_base->pads[i].dev);
-		}
-		kfree(joy_base);
+	hrtimer_cancel(&j->hrtimer);
+	if (j->wq)
+	{
+		drain_workqueue(j->wq);
+		destroy_workqueue(j->wq);
+		j->wq = NULL;
 	}
-	pr_info("GPIO Joystick Driver removed\n");
 }
 
-module_init(joy_init);
-module_exit(joy_exit);
+static int gpio_joy_suspend(struct device *dev)
+{
+	struct joy *j = dev_get_drvdata(dev);
+	hrtimer_cancel(&j->hrtimer);
+	if (j->wq)
+		drain_workqueue(j->wq);
+	return 0;
+}
+
+static int gpio_joy_resume(struct device *dev)
+{
+	struct joy *j = dev_get_drvdata(dev);
+	if (j->used)
+		hrtimer_start(&j->hrtimer, ns_to_ktime(POLL_INTERVAL_NS), HRTIMER_MODE_REL);
+	return 0;
+}
+
+static const struct dev_pm_ops gpio_joy_pm_ops = {
+	.suspend = gpio_joy_suspend,
+	.resume = gpio_joy_resume,
+};
+
+static struct platform_driver gpio_joy_driver = {
+	.driver = {
+		.name = "gpio-joystick",
+		.of_match_table = gpio_joy_of_match,
+		.pm = &gpio_joy_pm_ops,
+	},
+	.probe = gpio_joy_probe,
+	.remove = gpio_joy_remove,
+};
+
+module_platform_driver(gpio_joy_driver);

@@ -4,18 +4,24 @@ This repository contains the GPIO Joystick Driver for Raspberry Pi 5, which allo
 
 ## Features
 
-* Supports up to 2 joysticks, each with 13 inputs:
+* Supports 2 joysticks, each with 14 inputs:
 
   * 4 digital directions: Up, Down, Left, Right.
-  * 9 buttons: Start, Select, A, B, TR, Y, X, TL, Home.
-* High-performance 1 ms polling using hrtimers.
-* Configurable via `ARCADE_MODE` and device tree overlays.
+  * Up to 10 buttons:
+    * P1: Start, Select/Coin, A/1, B/2, TR/6, Y/3, X/4, TL/5, Home/Service, Test
+    * P2: Start, Select/Coin, A/1, B/2, TR/6, Y/3, X/4, TL/5
+* High-performance 1 ms polling.
 * Device Tree compilation integrated into the `Makefile` for ease of use.
+
+## Schema
+
+![Schema](schema.png "Schema")
+
 
 ## Requirements
 
 * Raspberry Pi 5 (RP1-based GPIO pin controller).
-* Linux kernel version >= 6.6.
+* Tested in Linux kernel version 6.12.
 * `evtest` or `jstest` for input testing.
 
 ## Installation
@@ -31,9 +37,13 @@ sudo apt install gpiod libgpiod-dev device-tree-compiler
 Compile and install the kernel module and device tree overlay automatically:
 
 ```bash
-make
 sudo make install
-sudo depmod -a
+```
+
+Edit `/boot/config.txt` and add:
+
+```bash
+dtoverlay=gpio-joystick
 ```
 
 Reboot to activate the changes:
@@ -55,7 +65,7 @@ make
 Manually insert the module (temporary until reboot):
 
 ```bash
-sudo insmod gpio-joystick.ko map=1,2
+sudo insmod gpio-joystick.ko
 ```
 
 #### 3. Check Logs
@@ -63,10 +73,16 @@ sudo insmod gpio-joystick.ko map=1,2
 Verify the driver is loaded and joysticks are detected:
 
 ```bash
-dmesg | grep "GPIO Joystick"
+dmesg | egrep -i 'gpio[-_]joystick|rta,gpio-joystick'
 ```
 
 ## Testing
+
+### Check module information
+
+```bash
+modinfo gpio-joystick
+```
 
 ### Using `evtest`
 
@@ -116,9 +132,10 @@ sudo pinctrl gpiochip4 4 ip pu   # Set GPIO4 as input with pull-up
 sudo pinctrl gpiochip4 17 ip pu  # Set GPIO17 as input with pull-up
 sudo pinctrl gpiochip4 27 ip pu  # Set GPIO27 as input with pull-up
 sudo pinctrl gpiochip4 22 ip pu  # Set GPIO22 as input with pull-up
+...
 ```
 
-Repeat this for all GPIO pins used by your joystick.
+The above is just an example. Repeat this for all GPIO pins used by your joystick.
 
 ## Device Tree Overlay (permanent configuration)
 
@@ -130,12 +147,12 @@ Run the following commands to build and install the overlay manually:
 
 ```bash
 make dtb
-sudo cp gpio-joystick.dtbo /boot/overlays/
+sudo cp gpio-joystick.dtbo /boot/firmware/overlays/
 ```
 
 ### Enable the Overlay
 
-Edit `/boot/config.txt` and add:
+Edit `/boot/firmware/config.txt` and add:
 
 ```bash
 dtoverlay=gpio-joystick
