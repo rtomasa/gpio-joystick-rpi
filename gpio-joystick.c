@@ -125,8 +125,8 @@ static void joy_gpio_read_packet(struct joy_pad *pad, unsigned char *data)
 	for (int i = 0; i < TOTAL_INPUTS; i++)
 	{
 		struct gpio_desc *d = pad->gpiods[i];
-		int v = d ? gpiod_get_value_cansleep(d) : 1; /* pull-up => sin pulsar */
-		data[i] = (v == 0) ? 1 : 0;				     /* activo en bajo (GPIO_ACTIVE_HIGH) */
+		int v = d ? gpiod_get_value_cansleep(d) : 1; /* pull-up => not pressed */
+		data[i] = (v == 0) ? 1 : 0;				     /* active low (GPIO_ACTIVE_HIGH) */
 	}
 }
 
