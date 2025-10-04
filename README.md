@@ -177,8 +177,11 @@ sudo reboot
 
 ## Contributions
 
-Contributions are welcome! Please fork the repository, make changes, and submit a pull request.
+Contributions are welcome! Please fork the repository, make your changes, and submit a pull request.  
+However, be aware that this driver is primarily developed to support the **RGB-Pi JAMMA 2** hardware.  
+As such, its structure and functionality may change at any time to meet the evolving requirements of that device.  
+While community improvements are appreciated, long-term compatibility with third-party setups cannot be guaranteed.
 
 ## License
 
-This project is licensed under the GPLv2 License. See the LICENSE file for details.
+This project is licensed under the GPLv3 License. See the LICENSE file for details.
