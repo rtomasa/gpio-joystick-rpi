@@ -1,6 +1,10 @@
 # GPIO Joystick Driver for Raspberry Pi 5
 
-This repository contains the GPIO Joystick Driver for Raspberry Pi 5, which allows using GPIO pins to connect arcade-style joysticks with digital buttons.
+This repository provides a GPIO Joystick Driver for the Raspberry Pi 5, enabling the use of GPIO pins to connect arcade-style joysticks with digital buttons.
+
+Please note that this driver is primarily developed for the **RGB-Pi JAMMA 2** hardware.  
+Its structure and functionality may change at any time to meet the evolving requirements of that device.  
+Long-term compatibility with other or third-party configurations is therefore not guaranteed.
 
 ## Features
 
