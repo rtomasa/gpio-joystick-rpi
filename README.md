@@ -40,10 +40,15 @@ Compile and install the kernel module and device tree overlay automatically:
 sudo make install
 ```
 
-Edit `/boot/config.txt` and add:
+Edit `/boot/firmware/config.txt` and add:
 
+Use internal GPIO pull-up resistors (default):
 ```bash
-dtoverlay=gpio-joystick
+dtoverlay=gpio-joystick-pullup
+```
+Use external resistors (internal bias disabled):
+```bash
+dtoverlay=gpio-joystick-bias-disable
 ```
 
 Reboot to activate the changes:
@@ -147,15 +152,21 @@ Run the following commands to build and install the overlay manually:
 
 ```bash
 make dtb
-sudo cp gpio-joystick.dtbo /boot/firmware/overlays/
+sudo cp gpio-joystick-pullup.dtbo /boot/firmware/overlays/
+sudo cp gpio-joystick-bias-disable.dtbo /boot/firmware/overlays/
 ```
 
 ### Enable the Overlay
 
 Edit `/boot/firmware/config.txt` and add:
 
+Use internal GPIO pull-up resistors (default):
 ```bash
-dtoverlay=gpio-joystick
+dtoverlay=gpio-joystick-pullup
+```
+Use external resistors (internal bias disabled):
+```bash
+dtoverlay=gpio-joystick-bias-disable
 ```
 
 Reboot to apply changes:

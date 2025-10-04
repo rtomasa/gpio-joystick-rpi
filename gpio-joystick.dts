@@ -1,6 +1,16 @@
 /dts-v1/;
 /plugin/;
 
+/* Pull mode selection via CPP:
+ *  -DBIAS_PULL_UP => bias-pull-up
+ * (default)  => bias-disable
+ */
+#ifdef BIAS_PULL_UP
+#define BIAS_PROP bias-pull-up
+#else
+#define BIAS_PROP bias-disable
+#endif
+
 / {
     compatible = "brcm,bcm2712";
 
@@ -13,40 +23,38 @@
             /* Pullup configurations: bias-pull-up, bias-pull-down, bias-disable */
 
             player1_pins: player1_pins {
-                pin_up     { pins = "gpio4";  function = "gpio"; input-enable; bias-pull-up; };
-                pin_down   { pins = "gpio17"; function = "gpio"; input-enable; bias-pull-up; };
-                pin_left   { pins = "gpio27"; function = "gpio"; input-enable; bias-pull-up; };
-                pin_right  { pins = "gpio22"; function = "gpio"; input-enable; bias-pull-up; };
-                pin_start  { pins = "gpio10"; function = "gpio"; input-enable; bias-pull-up; };
-                pin_select { pins = "gpio9";  function = "gpio"; input-enable; bias-pull-up; };   
-                pin_a      { pins = "gpio25"; function = "gpio"; input-enable; bias-pull-up; };
-                pin_b      { pins = "gpio24"; function = "gpio"; input-enable; bias-pull-up; };
-                pin_tr     { pins = "gpio23"; function = "gpio"; input-enable; bias-pull-up; };
-                pin_y      { pins = "gpio18"; function = "gpio"; input-enable; bias-pull-up; };
-                pin_x      { pins = "gpio15"; function = "gpio"; input-enable; bias-pull-up; };
-                pin_tl     { pins = "gpio14"; function = "gpio"; input-enable; bias-pull-up; };
-                pin_home   { pins = "gpio2";  function = "gpio"; input-enable; bias-pull-up; };
-                pin_test   { pins = "gpio3";  function = "gpio"; input-enable; bias-pull-up; };
+                pin_up     { pins = "gpio4";  function = "gpio"; input-enable; BIAS_PROP; };
+                pin_down   { pins = "gpio17"; function = "gpio"; input-enable; BIAS_PROP; };
+                pin_left   { pins = "gpio27"; function = "gpio"; input-enable; BIAS_PROP; };
+                pin_right  { pins = "gpio22"; function = "gpio"; input-enable; BIAS_PROP; };
+                pin_start  { pins = "gpio10"; function = "gpio"; input-enable; BIAS_PROP; };
+                pin_select { pins = "gpio9";  function = "gpio"; input-enable; BIAS_PROP; };
+                pin_a      { pins = "gpio25"; function = "gpio"; input-enable; BIAS_PROP; };
+                pin_b      { pins = "gpio24"; function = "gpio"; input-enable; BIAS_PROP; };
+                pin_tr     { pins = "gpio23"; function = "gpio"; input-enable; BIAS_PROP; };
+                pin_y      { pins = "gpio18"; function = "gpio"; input-enable; BIAS_PROP; };
+                pin_x      { pins = "gpio15"; function = "gpio"; input-enable; BIAS_PROP; };
+                pin_tl     { pins = "gpio14"; function = "gpio"; input-enable; BIAS_PROP; };
+                pin_home   { pins = "gpio2";  function = "gpio"; input-enable; BIAS_PROP; };
+                pin_test   { pins = "gpio3";  function = "gpio"; input-enable; BIAS_PROP; };
             };
 
             player2_pins: player2_pins {
-                pin_up     { pins = "gpio11"; function = "gpio"; input-enable; bias-pull-up; };
-                pin_down   { pins = "gpio5";  function = "gpio"; input-enable; bias-pull-up; };
-                pin_left   { pins = "gpio6";  function = "gpio"; input-enable; bias-pull-up; };
-                pin_right  { pins = "gpio13"; function = "gpio"; input-enable; bias-pull-up; };
-                pin_start  { pins = "gpio19"; function = "gpio"; input-enable; bias-pull-up; };
-                pin_select { pins = "gpio26"; function = "gpio"; input-enable; bias-pull-up; };
-                pin_a      { pins = "gpio21"; function = "gpio"; input-enable; bias-pull-up; };
-                pin_b      { pins = "gpio20"; function = "gpio"; input-enable; bias-pull-up; };
-                pin_tr     { pins = "gpio16"; function = "gpio"; input-enable; bias-pull-up; };
-                pin_y      { pins = "gpio12"; function = "gpio"; input-enable; bias-pull-up; };
-                pin_x      { pins = "gpio7";  function = "gpio"; input-enable; bias-pull-up; };
-                pin_tl     { pins = "gpio8";  function = "gpio"; input-enable; bias-pull-up; };
+                pin_up     { pins = "gpio11"; function = "gpio"; input-enable; BIAS_PROP; };
+                pin_down   { pins = "gpio5";  function = "gpio"; input-enable; BIAS_PROP; };
+                pin_left   { pins = "gpio6";  function = "gpio"; input-enable; BIAS_PROP; };
+                pin_right  { pins = "gpio13"; function = "gpio"; input-enable; BIAS_PROP; };
+                pin_start  { pins = "gpio19"; function = "gpio"; input-enable; BIAS_PROP; };
+                pin_select { pins = "gpio26"; function = "gpio"; input-enable; BIAS_PROP; };
+                pin_a      { pins = "gpio21"; function = "gpio"; input-enable; BIAS_PROP; };
+                pin_b      { pins = "gpio20"; function = "gpio"; input-enable; BIAS_PROP; };
+                pin_tr     { pins = "gpio16"; function = "gpio"; input-enable; BIAS_PROP; };
+                pin_y      { pins = "gpio12"; function = "gpio"; input-enable; BIAS_PROP; };
+                pin_x      { pins = "gpio7";  function = "gpio"; input-enable; BIAS_PROP; };
+                pin_tl     { pins = "gpio8";  function = "gpio"; input-enable; BIAS_PROP; };
             };
         };
     };
-
-    /* Both joystick devices live under a container with 1-cell addresses */
 
     fragment@1 {
         target-path = "/";
@@ -56,7 +64,7 @@
                 #address-cells = <1>;
                 #size-cells = <0>;
 
-                gpio_joystick0: gpio-joystick@0 {
+                gpio-joystick@0 {
                     compatible = "rta,gpio-joystick";
                     status = "okay";
                     pinctrl-names = "default";
@@ -82,7 +90,7 @@
                     test-gpios   = <&rp1_gpio  3 0>;
                 };
 
-                gpio_joystick1: gpio-joystick@1 {
+                gpio-joystick@1 {
                     compatible = "rta,gpio-joystick";
                     status = "okay";
                     pinctrl-names = "default";
